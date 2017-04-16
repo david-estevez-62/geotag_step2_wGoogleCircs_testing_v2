@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{ title }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <link rel='stylesheet' href='/styles/sitedefaults.css' />
+  </head>
+  <body>
+ 
+  	<div id="map"></div>
+    <div id="load-screen"><div id="loading"><img src="/images/loader.gif" /></div></div>
+    
+    <img id="dashbrd-overlay-display" src="/images/scanbar.png" class="hidden" />
+    <button id="reset-zoom">Reset Map Zoom Level</button>
+    <button id="re-center">Recenter Map</button>
+    <button id="show-dashboard">Show db display</button>
+
+    <button id="show-btmbar">Show btm bar</button>
+    <div id="btmbar" class="hidden"></div>
+	<script>
+
+    var map,
+        getPos,
+        mapStyles,
+        origCoords,
+        gameCircleInner;
+
+
+    if(navigator.geolocation){
+
+      function initMap(pos) {
+        origCoords = pos;
+        mapStyleSettings(); // get / set map styles array
+        removeLoader(); // remove load screen
+
+        map = new google.maps.Map(document.getElementById('map'), {
+              zoom: 19,
+              styles: mapStyles,
+              disableDefaultUI: true,
+              center: {
+                lat: pos.coords.latitude + 0.00014, //pos.coords.latitude + 0.00014,
+                lng: pos.coords.longitude
+              }
+          });
+
+        configMapListeners(); // initialize google maps listeners
+
+      };
+
+       getPos = function(){navigator.geolocation.getCurrentPosition(initMap);};
+
+
+    }
+
+
+
+
+    function mapStyleSettings(){
+      mapStyles = [{"elementType":"labels.text.fill","stylers":[{"color":"#746855"}]},{"elementType":"geometry","stylers":[{"color":"#242f3e"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#242f3e"}]},{"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#263c3f"}]},{"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#6b9a76"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#38414e"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#212a37"}]},{"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#9ca5b3"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#746855"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#1f2835"}]},{"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#f3d19c"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2f3948"}]},{"featureType":"transit.station","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#17263c"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#515c6d"}]},{"featureType":"water","elementType":"labels.text.stroke","stylers":[{"color":"#17263c"}]},{"featureType":"landscape.man_made","elementType":"geometry.fill","stylers":[{"hue":"#00ffe6"},{"saturation":-20}]}];
+    }
+
+
+    function removeLoader(){
+
+        var loadScreen = document.getElementById('load-screen');
+        document.body.removeChild(loadScreen);
+    }
+
+    function configMapListeners(){
+      google.maps.event.addDomListener(window, "resize", function() {
+         google.maps.event.trigger(map, "resize");
+         map.setCenter({ lat: origCoords.coords.latitude + (0.00014 * (2*((window.innerHeight-450)/(900-450))) - 0.00014), lng: origCoords.coords.longitude });
+         if(gameCircleInner){
+            gameCircleInner.setRadius(adjInnerFieldRadius());
+         }
+      });
+    }
+
+    // make / create google maps circle template factory
+    function newGoogleMapsRadius(radius, isOuterField){
+      
+      var strkOpacity = 0.1,
+          strkWght = 6,
+          color = isOuterField ? "yellow" : "red";
+
+      return {
+        strokeColor: color,
+        strokeOpacity: strkOpacity,
+        strokeWeight: strkWght,
+        fillColor: color,
+        map: map,
+        center: {
+          // lat: adjusts north south direction of circles this conditional is used so both the players
+          // inner field radius and outer field radius can use the same circle templating function with 
+          // the inner being lifted north of center
+          lat: isOuterField ? origCoords.coords.latitude - 0.00095 : origCoords.coords.latitude - 0.00066, 
+          lng: origCoords.coords.longitude
+        },
+        radius: radius
+      }
+    }
+
+    function adjInnerFieldRadius(){
+      if(window.innerWidth < 900){
+            return 55;
+         }else if(window.innerWidth < 1300){
+            return 62;
+         }else{
+            return 72;
+         }
+    }
+
+
+    
+
+
+    document.getElementById('show-dashboard').onclick = function() {
+      var dashboardOverlay = document.getElementById('dashbrd-overlay-display');
+
+      if(dashboardOverlay.className === "hidden"){
+        // the user or players outer field radius, following line is inner field radius
+        var outerPersonalFieldRadius = newGoogleMapsRadius(160, true);
+        var innerPersonalFieldRadius = newGoogleMapsRadius(adjInnerFieldRadius());
+
+        // Attached inner and outer fields to google maps
+        gameCircleOuter = new google.maps.Circle(outerPersonalFieldRadius);
+        gameCircleInner = new google.maps.Circle(innerPersonalFieldRadius);
+        dashboardOverlay.className = "";
+      }else{
+        gameCircleOuter.setMap(null);
+        gameCircleInner.setMap(null);
+        dashboardOverlay.className = "hidden";
+      }
+    }
+    
+
+    // reset orig zoom level state
+    document.getElementById('reset-zoom').onclick = function(){
+      map.setZoom(19);
+    }
+
+    // reposition map back to center
+    document.getElementById('re-center').onclick = function(){
+      map.setCenter({ lat: origCoords.coords.latitude + (0.00014 * (2*((window.innerHeight-450)/(900-450))) - 0.00014), lng: origCoords.coords.longitude });
+    }
+
+
+
+    // Not sure to keep: For testing purposes
+    document.getElementById('show-btmbar').onclick = function() {
+      var btmBar = document.getElementById('btmbar');
+
+      if(btmBar.className === "hidden"){
+        btmBar.className = "";
+      }else{
+        btmBar.className = "hidden";
+      }
+    }
+
+
+  </script>
+  
+
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCAqAI4H3MVOaLLhK-AFZUDL_LpUvV5uTE&callback=getPos"></script>
+
+
+  <!-- The if loop will be executed if browsers navigator object is not found and (Therefore) getPos function is not set --> 
+  <script type="text/javascript">
+    if(!getPos){
+
+      (function dialogBox() {
+        var ask = window.confirm("Signal looks to be weak unable to get coordinates. Would you like us to refresh for you and try again?")
+        if (ask) {
+            document.location.reload();
+        }
+      })()
+
+    }
+  </script>
+  </body>
+</html>
